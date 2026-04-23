@@ -215,6 +215,15 @@ async def test_searchable_view_persists_fts_table(ds_client):
 
 
 @pytest.mark.asyncio
+async def test_column_actions_mobile_button_visible_for_zero_row_tables(ds_client):
+    response = await ds_client.get("/fixtures/123_starts_with_digits")
+    assert response.status_code == 200
+    form_html = response.text
+    assert 'class="column-actions-mobile small-screen-only"' in form_html
+    assert '>Column actions<' in form_html
+
+
+@pytest.mark.asyncio
 async def test_sort_by_desc_redirects(ds_client):
     path_base = "/fixtures/sortable"
     path = (
