@@ -21,6 +21,7 @@ const DOM_SELECTORS = {
 
   /** Used to add "where"  clauses to query using direct manipulation */
   filterRows: ".filter-row",
+  filterRow: ".filter-row",
   /** Used to show top available enum values for a column ("facets") */
   facetResults: ".facet-results [data-column]",
 };

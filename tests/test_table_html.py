@@ -202,6 +202,16 @@ async def test_empty_search_parameter_gets_removed(ds_client):
 
 
 @pytest.mark.asyncio
+async def test_table_page_shows_add_another_filter_button(ds_client):
+    response = await ds_client.get("/fixtures/compound_three_primary_keys")
+    assert response.status_code == 200
+    form = Soup(response.text, "html.parser").find("form", {"action": "/fixtures/compound_three_primary_keys"})
+    assert form is not None
+    buttons = [button.get_text(" ", strip=True) for button in form.find_all("button")]
+    assert "Add another filter" in buttons
+
+
+@pytest.mark.asyncio
 async def test_searchable_view_persists_fts_table(ds_client):
     # The search form should persist ?_fts_table as a hidden field
     response = await ds_client.get(

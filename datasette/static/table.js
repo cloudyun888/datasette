@@ -634,31 +634,99 @@ const initDatasetteTable = function (manager) {
   });
 };
 
+function getFilterRowSelector(manager) {
+  return manager.selectors.filterRows || manager.selectors.filterRow;
+}
+
+function getFilterRows(manager) {
+  return Array.from(document.querySelectorAll(getFilterRowSelector(manager))).filter(
+    (el) => el.querySelector(".filter-op"),
+  );
+}
+
+function ensureRemoveButtonForFilterRow(manager, row) {
+  var x = "✖";
+  var existing = row.querySelector(".remove-filter-row");
+  if (existing) {
+    return existing;
+  }
+  var a = document.createElement("a");
+  a.className = "remove-filter-row";
+  a.setAttribute("href", "#");
+  a.setAttribute("aria-label", "Remove this filter");
+  a.style.textDecoration = "none";
+  a.innerText = x;
+  a.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    let currentRow = ev.target.closest(getFilterRowSelector(manager));
+    currentRow.querySelector('select[name^="_filter_column"]').value = "";
+    currentRow.querySelector('select[name^="_filter_op"]').value = "exact";
+    currentRow.querySelector("input.filter-value").value = "";
+    ev.target.closest("a").style.display = "none";
+  });
+  row.appendChild(a);
+  return a;
+}
+
+function updateRemoveButtonVisibility(manager, row) {
+  var button = ensureRemoveButtonForFilterRow(manager, row);
+  var column = row.querySelector('select[name^="_filter_column"]');
+  button.style.display = column && column.value ? "inline" : "none";
+}
+
+function setFilterRowNumber(row, number) {
+  row.querySelector('select[name^="_filter_column"]').name = `_filter_column_${number}`;
+  row.querySelector('select[name^="_filter_op"]').name = `_filter_op_${number}`;
+  row.querySelector('input[name^="_filter_value"]').name = `_filter_value_${number}`;
+}
+
+function resetBlankFilterRow(row) {
+  row.querySelector('select[name^="_filter_column"]').name = "_filter_column";
+  row.querySelector('select[name^="_filter_column"]').value = "";
+  row.querySelector('select[name^="_filter_op"]').name = "_filter_op";
+  row.querySelector('select[name^="_filter_op"]').value = "exact";
+  row.querySelector('input[name^="_filter_value"]').name = "_filter_value";
+  row.querySelector('input[name^="_filter_value"]').value = "";
+  row.querySelector('input[name^="_filter_value"]').removeAttribute("list");
+}
+
 /* Add x buttons to the filter rows */
 function addButtonsToFilterRows(manager) {
-  var x = "✖";
-  var rows = Array.from(
-    document.querySelectorAll(manager.selectors.filterRow),
-  ).filter((el) => el.querySelector(".filter-op"));
-  rows.forEach((row) => {
-    var a = document.createElement("a");
-    a.setAttribute("href", "#");
-    a.setAttribute("aria-label", "Remove this filter");
-    a.style.textDecoration = "none";
-    a.innerText = x;
-    a.addEventListener("click", (ev) => {
-      ev.preventDefault();
-      let row = ev.target.closest("div");
-      row.querySelector("select").value = "";
-      row.querySelector(".filter-op select").value = "exact";
-      row.querySelector("input.filter-value").value = "";
-      ev.target.closest("a").style.display = "none";
-    });
-    row.appendChild(a);
-    var column = row.querySelector("select");
-    if (!column.value) {
-      a.style.display = "none";
+  getFilterRows(manager).forEach((row) => {
+    ensureRemoveButtonForFilterRow(manager, row);
+    updateRemoveButtonVisibility(manager, row);
+  });
+}
+
+function initAddAnotherFilterButton(manager) {
+  var addButton = document.querySelector(".add-filter-row");
+  if (!addButton) {
+    return;
+  }
+  addButton.addEventListener("click", function (ev) {
+    ev.preventDefault();
+    var rows = getFilterRows(manager);
+    var blankRow = rows.find(
+      (row) => row.querySelector('select[name="_filter_column"]') !== null,
+    );
+    if (!blankRow) {
+      return;
     }
+    var numberedRows = rows.filter(
+      (row) => row.querySelector('select[name^="_filter_column_"]') !== null,
+    );
+    setFilterRowNumber(blankRow, numberedRows.length + 1);
+    updateRemoveButtonVisibility(manager, blankRow);
+
+    var newBlankRow = blankRow.cloneNode(true);
+    resetBlankFilterRow(newBlankRow);
+    var removeButton = newBlankRow.querySelector(".remove-filter-row");
+    if (removeButton) {
+      removeButton.remove();
+    }
+    ensureRemoveButtonForFilterRow(manager, newBlankRow);
+    updateRemoveButtonVisibility(manager, newBlankRow);
+    blankRow.parentNode.insertBefore(newBlankRow, addButton.closest(getFilterRowSelector(manager)));
   });
 }
 
@@ -688,13 +756,14 @@ function initAutocompleteForFilterValues(manager) {
     });
   }
   createDataLists();
-  // When any select with name=_filter_column changes, update the datalist
+  // When any filter-column select changes, update the datalist and remove-button state
   document.body.addEventListener("change", function (event) {
-    if (event.target.name === "_filter_column") {
-      event.target
-        .closest(manager.selectors.filterRow)
+    if (event.target.name && event.target.name.indexOf("_filter_column") === 0) {
+      var row = event.target.closest(getFilterRowSelector(manager));
+      row
         .querySelector(".filter-value")
         .setAttribute("list", "datalist-" + event.target.value);
+      updateRemoveButtonVisibility(manager, row);
     }
   });
 }
@@ -753,5 +822,6 @@ document.addEventListener("datasette_init", function (evt) {
 
   // Other UI functions with interactive JS needs
   addButtonsToFilterRows(manager);
+  initAddAnotherFilterButton(manager);
   initAutocompleteForFilterValues(manager);
 });
